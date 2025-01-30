@@ -13,7 +13,7 @@ const Login = () => {
 
     useEffect(() => {
         const authenticate = Cookies.get("sesion")
-        if(authenticate){
+        if (authenticate) {
             navigate("/")
         }
     }, [])
@@ -35,7 +35,7 @@ const Login = () => {
             console.log(result.data.data)
             navigate("/")
         }).catch((e) => {
-            toast.error("Error al iniciar sesion, corrige tus datos")
+            toast.error(e?.response?.data ? e.response.data.message : "Error al iniciar sesion, corrige tus datos")
         })
     }
     return (
@@ -92,7 +92,7 @@ const Login = () => {
                                     <Link to={'/register'} class="ml-3 border-b border-gray-500 border-dotted">
                                         Registrate
                                     </Link>
-                                  
+
                                 </p>
 
                             </div>

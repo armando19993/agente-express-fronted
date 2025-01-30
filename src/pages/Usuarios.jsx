@@ -23,6 +23,7 @@ const Usuarios = () => {
     const [empresas, setEmpresas] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [status, setStatus] = useState('ACTIVO'); // Variable para el estado del usuario
     const role = Cookies.get("role");
 
     const closeModal = () => {
@@ -32,6 +33,7 @@ const Usuarios = () => {
         setName('');
         setTelefono('');
         setTypeUser('OPERADOR');
+        setStatus('ACTIVO'); // Restablecer el estado al abrir el modal
         setSelectedUser(null);
         if (role === 'SUPERADM') setEmpresaId('');
     };
@@ -56,7 +58,8 @@ const Usuarios = () => {
             name,
             telefono,
             type_user: typeUser,
-            empresaId: empresaId || null
+            empresaId: empresaId || null,
+            status // Agregar el estado al payload
         };
 
         if (modalType === 'create') {
@@ -69,7 +72,7 @@ const Usuarios = () => {
                 .catch(() => toast.error('No se ha podido crear el usuario. ¡Intente nuevamente!'))
                 .finally(() => setLoading(false));
         } else if (modalType === 'edit' && selectedUser) {
-            instanceWithToken.put(`users/${selectedUser.id}`, payload)
+            instanceWithToken.patch(`users/${selectedUser.id}`, payload)
                 .then(() => {
                     toast.success('Usuario actualizado con éxito!');
                     closeModal();
@@ -90,12 +93,14 @@ const Usuarios = () => {
             setTelefono(usuario.telefono || '');
             setTypeUser(usuario.type_user);
             setEmpresaId(usuario.empresaId || '');
+            setStatus(usuario.status); // Establecer el estado del usuario al abrir el modal
         } else {
             setUser('');
             setPassword('');
             setName('');
             setTelefono('');
             setTypeUser('OPERADOR');
+            setStatus('ACTIVO'); // Restablecer el estado al abrir el modal
             if (role === 'SUPERADM') setEmpresaId('');
         }
 
@@ -118,12 +123,18 @@ const Usuarios = () => {
         { value: 'OPERADOR', label: 'Operador' }
     ];
 
+    const statusOptions = [
+        { value: 'ACTIVO', label: 'Activo' },
+        { value: 'INACTIVO', label: 'Inactivo' }
+    ];
+
     const columns = [
         { header: 'ID', key: 'publicId' },
         { header: 'Usuario', key: 'user' },
         { header: 'Nombre', key: 'name' },
         { header: 'Teléfono', key: 'telefono' },
         { header: 'Rol', key: 'type_user' },
+        { header: 'Estado', key: 'status' },
         {
             header: 'Acciones',
             key: 'actions',
@@ -148,7 +159,8 @@ const Usuarios = () => {
                 <Input value={password} setvalue={setPassword} placeholder="Contraseña" type="password" />
                 <Input value={name} setvalue={setName} placeholder="Nombre" />
                 <Input value={telefono} setvalue={setTelefono} placeholder="Teléfono" />
-                <Select options={typeUserOptions} value={typeUser} setValue={setTypeUser} placeholder="Seleccione el tipo de usuario" />
+                <Select options={typeUserOptions} value={typeUser} setvalue={setTypeUser} placeholder="Seleccione el tipo de usuario" />
+                <Select options={statusOptions} value={status} setvalue={setStatus} placeholder="Seleccione el estado" /> {/* Nuevo select para el estado */}
                 {role === 'SUPERADM' && (
                     <Select
                         options={empresas.map(e => ({ value: e.id, label: e.razon_social }))}
@@ -162,6 +174,7 @@ const Usuarios = () => {
                     <Button title="Cancelar" onClick={closeModal} size="full" variant="secondary" />
                 </div>
             </Modal>
+
             <Table columns={columns} data={usuarios} />
         </div>
     );
