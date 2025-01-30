@@ -113,13 +113,15 @@ const Register = () => {
                             </div>
 
                             {/* Botón que ocupa las dos columnas */}
-
-                            <Button
-                                loading={regsitrando}
-                                title={'Registrate'}
-                                icon={FaUserGraduate}
-                                onClick={register}
-                            />
+                            <div className='col-span-2 gap-4'>
+                                <Button
+                                    loading={regsitrando}
+                                    title={'Registrate'}
+                                    icon={FaUserGraduate}
+                                    onClick={register}
+                                    size='full'
+                                />
+                            </div>
 
 
                             {/* Enlace que ocupa las dos columnas */}

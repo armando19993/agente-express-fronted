@@ -33,7 +33,7 @@ const sidebarLinks = [
         roles: ["SUPERADM", "ADMIN"]
       },
       {
-        name: 'Ususarios',
+        name: 'Usuarios',
         icon: <FaUsersCog className="text-xl" />,
         to: "/usuarios",
         roles: ["SUPERADM", "ADMIN"]
