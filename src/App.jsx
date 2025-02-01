@@ -13,6 +13,8 @@ import Empresas from './pages/Empresas';
 import Sucursales from './pages/Sucursales';
 import Entidades from './pages/Entidades';
 import Usuarios from './pages/Usuarios';
+import CrearOperacion from './pages/operaciones/CrearOperacion';
+import Transacciones from './pages/operaciones/Transacciones';
 
 function App() {
   const location = useLocation();
@@ -36,6 +38,8 @@ function App() {
           <Route path='/sucursales' element={<Sucursales />} />
           <Route path='/entidades' element={<Entidades />} />
           <Route path='/usuarios' element={<Usuarios />} />
+          <Route path='/operaciones/crear/:tipo' element={<CrearOperacion />} />
+          <Route path='/operaciones' element={<Transacciones />} />
         </Route>
       </Routes>
     </>
