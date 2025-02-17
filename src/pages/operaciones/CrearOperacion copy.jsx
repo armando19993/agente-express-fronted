@@ -56,6 +56,39 @@ const DYNAMIC_FIELDS = {
     ]
 };
 
+// Configuración de extracción para cada tipo (esto es un ejemplo, deberás ajustarlo a tus necesidades)
+const EXTRACTION_CONFIG = {
+    PAGO_SERVICIO: [
+        {
+            // Extrae el importe luego de "S/ "
+            key: 'importe',
+            regex: /Monto pagado[\s\S]*?S\/\s*([\d.,]+)/i,
+            transform: (val) => val.replace(',', '.')
+        },
+        {
+            key: 'empresa',
+            regex: /Pagado a[\s\S]*?(\w+)/i
+        },
+        {
+            key: 'servicio',
+            regex: /Servicio[\s\S]*?([A-Z\s]+)/i
+        },
+        {
+            key: 'codigo_usuario',
+            regex: /Código de usuario[\s\S]*?(\d+)/i
+        },
+        {
+            key: 'titular',
+            regex: /Titular del servicio[\s\S]*?([\w\s]+)/i
+        },
+        {
+            key: 'nro_recibo',
+            regex: /N° recibo:\s*(\d+)/i
+        },
+    ],
+    // Otras configuraciones para DEPOSITO, GIRO, etc. se pueden definir de forma similar.
+};
+
 const CrearOperacion = () => {
     const { tipo } = useParams();
     const [tipoOperacion, setTipoOperacion] = useState("");
@@ -113,6 +146,38 @@ const CrearOperacion = () => {
         return "";
     };
 
+    // const parsePastedText = (text) => {
+    //     // Detectamos el tipo de operación basándonos en el contenido
+    //     const detectedTipo = detectTipoOperacion(text);
+    //     if (detectedTipo) {
+    //         setTipoOperacion(detectedTipo);
+    //     }
+
+    //     // Extraer datos específicos para el tipo detectado (si existe configuración)
+    //     if (detectedTipo && EXTRACTION_CONFIG[detectedTipo]) {
+    //         const extractedData = extractDataByConfig(text, EXTRACTION_CONFIG[detectedTipo]);
+    //         // Se asignan los valores extraídos a los campos dinámicos o estáticos según la clave.
+    //         // En este ejemplo, asumimos que "importe" se asigna a staticFieldsValues y el resto a dynamicFieldsValues.
+    //         const { importe, ...rest } = extractedData;
+    //         if (importe) {
+    //             setStaticFieldsValues((prev) => ({ ...prev, importe }));
+    //         }
+    //         setDynamicFieldsValues((prev) => ({
+    //             ...prev,
+    //             ...rest,
+    //         }));
+    //     }
+
+    //     // Extraer el número de operación
+    //     const nroOperacionMatch = text.match(/Nº de operación\s*(\d+)/i);
+    //     if (nroOperacionMatch && nroOperacionMatch[1]) {
+    //         setStaticFieldsValues((prev) => ({
+    //             ...prev,
+    //             nro_operacion: nroOperacionMatch[1].trim()
+    //         }));
+    //     }
+    // };
+
     const parsePastedText = (text) => {
         // Detectamos el tipo de operación basándonos en el contenido
         const detectedTipo = detectTipoOperacion(text);
@@ -120,30 +185,30 @@ const CrearOperacion = () => {
             setTipoOperacion(detectedTipo);
         }
 
-        // Extraer datos específicos para el tipo detectado (si existe configuración)
+        // Extraer datos específicos para el tipo detectado
         if (detectedTipo && EXTRACTION_CONFIG[detectedTipo]) {
             const extractedData = extractDataByConfig(text, EXTRACTION_CONFIG[detectedTipo]);
-            // Se asignan los valores extraídos a los campos dinámicos o estáticos según la clave.
-            // En este ejemplo, asumimos que "importe" se asigna a staticFieldsValues y el resto a dynamicFieldsValues.
-            const { importe, ...rest } = extractedData;
-            if (importe) {
-                setStaticFieldsValues((prev) => ({ ...prev, importe }));
-            }
-            setDynamicFieldsValues((prev) => ({
-                ...prev,
-                ...rest,
-            }));
-        }
 
-        // Extraer el número de operación
-        const nroOperacionMatch = text.match(/Nº de operación\s*(\d+)/i);
-        if (nroOperacionMatch && nroOperacionMatch[1]) {
+            // Asignamos los valores extraídos a los campos dinámicos o estáticos según corresponda
+            const { importe, nro_recibo, codigo_usuario, titular, empresa, servicio, ...rest } = extractedData;
+
             setStaticFieldsValues((prev) => ({
                 ...prev,
-                nro_operacion: nroOperacionMatch[1].trim()
+                importe: importe || prev.importe,
+                nro_operacion: nro_recibo || prev.nro_operacion
+            }));
+
+            setDynamicFieldsValues((prev) => ({
+                ...prev,
+                codigo_usuario: codigo_usuario || prev.codigo_usuario,
+                titular: titular || prev.titular,
+                empresa: empresa || prev.empresa,
+                servicio: servicio || prev.servicio,
+                ...rest
             }));
         }
     };
+
 
     const handlePaste = async (event) => {
         event.preventDefault();
@@ -199,16 +264,16 @@ const CrearOperacion = () => {
                                 options={[]}
                                 placeholder={'Entidad'}
                             />
-                            <Input 
-                                placeholder={'Nro Operacion'} 
-                                type='text' 
+                            <Input
+                                placeholder={'Nro Operacion'}
+                                type='text'
                                 value={staticFieldsValues.nro_operacion}
                                 onChange={(e) => handleStaticFieldChange('nro_operacion', e.target.value)}
                             />
-                            <Input 
-                                placeholder={'Fecha'} 
+                            <Input
+                                placeholder={'Fecha'}
                                 type='date'
-                                // Podrías manejar otro estado para la fecha
+                            // Podrías manejar otro estado para la fecha
                             />
                         </div>
                     </div>
@@ -230,19 +295,19 @@ const CrearOperacion = () => {
                     </div>
 
                     <div className='grid grid-cols-1 gap-4 p-3'>
-                        <Input 
-                            value={staticFieldsValues.importe || 0} 
+                        <Input
+                            value={staticFieldsValues.importe || 0}
                             label={'Importe'}
                             onChange={(e) => handleStaticFieldChange('importe', e.target.value)}
                         />
-                        <Input 
-                            value={staticFieldsValues.comision} 
+                        <Input
+                            value={staticFieldsValues.comision}
                             label={'Comisión'}
                             // Si la comisión siempre es 1, puedes deshabilitar el input:
                             disabled
                         />
-                        <Input 
-                            value={montoTotal} 
+                        <Input
+                            value={montoTotal}
                             label={'Monto Total'}
                             disabled
                         />
