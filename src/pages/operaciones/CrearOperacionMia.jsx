@@ -56,57 +56,39 @@ const DYNAMIC_FIELDS = {
     ]
 };
 
-// Configuración de extracción para cada tipo (esto es un ejemplo, deberás ajustarlo a tus necesidades)
+// Configuración para extraer datos del texto pegado según el tipo de operación
 const EXTRACTION_CONFIG = {
     PAGO_SERVICIO: [
-        {
-            // Extrae el importe luego de "S/ "
-            key: 'importe',
-            regex: /Monto pagado[\s\S]*?S\/\s*([\d.,]+)/i,
-            transform: (val) => val.replace(',', '.')
-        },
-        {
-            key: 'empresa',
-            regex: /Pagado a[\s\S]*?(\w+)/i
-        },
-        {
-            key: 'servicio',
-            regex: /Servicio[\s\S]*?([A-Z\s]+)/i
-        },
-        {
-            key: 'codigo_usuario',
-            regex: /Código de usuario[\s\S]*?(\d+)/i
-        },
-        {
-            key: 'titular',
-            regex: /Titular del servicio[\s\S]*?([\w\s]+)/i
-        },
-        {
-            key: 'nro_recibo',
-            regex: /N° recibo:\s*(\d+)/i
-        },
+        { key: 'categoria', regex: /Categoría:\s*(.+)/i },
+        { key: 'servicio', regex: /Servicio:\s*(.+)/i },
+        { key: 'empresa', regex: /Empresa:\s*(.+)/i },
+        { key: 'nro_recibo', regex: /Número de Recibo:\s*(\d+)/i },
+        { key: 'codigo_usuario', regex: /Código de Usuario:\s*(.+)/i },
+        { key: 'titular', regex: /Titular:\s*(.+)/i },
+        { key: 'importe', regex: /Importe:\s*([\d,.]+)/i, transform: (val) => parseFloat(val.replace(',', '')) },
     ],
-    // Otras configuraciones para DEPOSITO, GIRO, etc. se pueden definir de forma similar.
+    DEPOSITO: [
+        { key: 'banco_destino', regex: /Banco Destino:\s*(.+)/i },
+        { key: 'nro_cuenta', regex: /Número de Cuenta:\s*(\d+)/i },
+        { key: 'titular', regex: /Titular:\s*(.+)/i },
+        { key: 'importe', regex: /Importe:\s*([\d,.]+)/i, transform: (val) => parseFloat(val.replace(',', '')) },
+    ],
+    // Agrega configuraciones similares para otros tipos de operación...
 };
 
 const CrearOperacion = () => {
     const { tipo } = useParams();
     const [tipoOperacion, setTipoOperacion] = useState("");
     const [entidad, setEntidad] = useState("");
-    // Campos dinámicos para la operación (según DYNAMIC_FIELDS)
     const [dynamicFieldsValues, setDynamicFieldsValues] = useState({});
-    // Campos estáticos: importe, nro_operacion, etc.
-    // Definimos comisión en 1 por defecto
     const [staticFieldsValues, setStaticFieldsValues] = useState({
-        importe: 0,
+        importe: '',
         nro_operacion: '',
         comision: 1,
+        fecha: '',
     });
 
-    // Calculamos el monto total (importe + comisión)
     const montoTotal = (parseFloat(staticFieldsValues.importe) || 0) + (parseFloat(staticFieldsValues.comision) || 1);
-
-    // Opciones filtradas según el parámetro "tipo" de la URL
     const filteredOptions = TYPE_OPERATION.filter(option => option.tipo === tipo);
 
     const handleDynamicFieldChange = (key, value) => {
@@ -123,7 +105,6 @@ const CrearOperacion = () => {
         }));
     };
 
-    // Función que realiza la extracción de datos basado en la configuración
     const extractDataByConfig = (text, config) => {
         const data = {};
         config.forEach(({ key, regex, transform }) => {
@@ -135,100 +116,179 @@ const CrearOperacion = () => {
         return data;
     };
 
-    // Función para detectar el tipo de operación a partir del texto pegado.
     const detectTipoOperacion = (text) => {
-        // Ejemplo: si la primera línea contiene "Pago de servicio exitoso", se asigna PAGO_SERVICIO.
         const firstLine = text.split('\n')[0].toLowerCase();
-        if (firstLine.includes('pago de servicio exitoso')) {
-            return 'PAGO_SERVICIO';
-        }
-        // Aquí podrías agregar más condiciones para otros tipos...
+        if (firstLine.includes('pago de servicio')) return 'PAGO_SERVICIO';
+        if (firstLine.includes('depósito') || firstLine.includes('deposito')) return 'DEPOSITO';
+        if (firstLine.includes('giro')) return 'GIRO';
+        if (firstLine.includes('tarjeta')) return 'PAGO_TARJETA';
+        if (firstLine.includes('yape')) return 'DEPOSITOS_YAPE';
+        if (firstLine.includes('pasarela')) return 'PASARELA_PAGO';
+        if (firstLine.includes('retiro')) return 'RETIRO';
         return "";
     };
+//mercedes
 
-    // const parsePastedText = (text) => {
-    //     // Detectamos el tipo de operación basándonos en el contenido
-    //     const detectedTipo = detectTipoOperacion(text);
-    //     if (detectedTipo) {
-    //         setTipoOperacion(detectedTipo);
-    //     }
 
-    //     // Extraer datos específicos para el tipo detectado (si existe configuración)
-    //     if (detectedTipo && EXTRACTION_CONFIG[detectedTipo]) {
-    //         const extractedData = extractDataByConfig(text, EXTRACTION_CONFIG[detectedTipo]);
-    //         // Se asignan los valores extraídos a los campos dinámicos o estáticos según la clave.
-    //         // En este ejemplo, asumimos que "importe" se asigna a staticFieldsValues y el resto a dynamicFieldsValues.
-    //         const { importe, ...rest } = extractedData;
-    //         if (importe) {
-    //             setStaticFieldsValues((prev) => ({ ...prev, importe }));
-    //         }
-    //         setDynamicFieldsValues((prev) => ({
-    //             ...prev,
-    //             ...rest,
-    //         }));
-    //     }
 
-    //     // Extraer el número de operación
-    //     const nroOperacionMatch = text.match(/Nº de operación\s*(\d+)/i);
-    //     if (nroOperacionMatch && nroOperacionMatch[1]) {
-    //         setStaticFieldsValues((prev) => ({
-    //             ...prev,
-    //             nro_operacion: nroOperacionMatch[1].trim()
-    //         }));
-    //     }
-    // };
+
+    //formato para la FECHA
+    const parseDateString = (dateStr) => {
+        // Si ya está en formato yyyy-MM-dd, retornar directamente
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+        // Convertir formatos como "18 marzo 2024"
+        const months = {
+            enero: '01', febrero: '02', marzo: '03', abril: '04',
+            mayo: '05', junio: '06', julio: '07', agosto: '08',
+            septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12'
+        };
+
+        // Probar formato "18 marzo 2024"
+        const match = dateStr.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/i);
+        if (match) {
+            const [, day, monthName, year] = match;
+            const month = months[monthName.toLowerCase()];
+            if (month) {
+                return `${year}-${month}-${day.padStart(2, '0')}`;
+            }
+        }
+
+        // Probar formato "18/03/2024"
+        const slashMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (slashMatch) {
+            const [, day, month, year] = slashMatch;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+
+        return ''; // Si no se puede parsear, retornar vacío
+    };
+
 
     const parsePastedText = (text) => {
-        // Detectamos el tipo de operación basándonos en el contenido
+
         const detectedTipo = detectTipoOperacion(text);
         if (detectedTipo) {
             setTipoOperacion(detectedTipo);
         }
 
         // Extraer datos específicos para el tipo detectado
+
         if (detectedTipo && EXTRACTION_CONFIG[detectedTipo]) {
             const extractedData = extractDataByConfig(text, EXTRACTION_CONFIG[detectedTipo]);
-
-            // Asignamos los valores extraídos a los campos dinámicos o estáticos según corresponda
-            const { importe, nro_recibo, codigo_usuario, titular, empresa, servicio, ...rest } = extractedData;
-
-            setStaticFieldsValues((prev) => ({
-                ...prev,
-                importe: importe || prev.importe,
-                nro_operacion: nro_recibo || prev.nro_operacion
-            }));
-
+            const { importe, ...rest } = extractedData;
+            if (importe) {
+                setStaticFieldsValues((prev) => ({ ...prev, importe }));
+            }
             setDynamicFieldsValues((prev) => ({
                 ...prev,
-                codigo_usuario: codigo_usuario || prev.codigo_usuario,
-                titular: titular || prev.titular,
-                empresa: empresa || prev.empresa,
-                servicio: servicio || prev.servicio,
-                ...rest
+                ...rest,
             }));
         }
-    };
+
+        // Extraer número de OPERACION (patrón común)
+        const nroOperacionMatch = text.match(/(Nº de operación|Número de operación|Operación Nº)\s*[:]?\s*(\d+)/i);
+        console.log("OPERACION", nroOperacionMatch)
+        if (nroOperacionMatch && nroOperacionMatch[2]) {
+            setStaticFieldsValues((prev) => ({
+                ...prev,
+                nro_operacion: nroOperacionMatch[2].trim()
+            }));
+        }
+        // Extraer IMPORTE si no se encontró en la configuración específica
+        const importeMatch = text.match(/(Monto|Pagado|Transferido|enviado|Importe|Total)\s*[:]?\s*(S\/)?\s*([\d,.]+)/i);
+        console.log("MONTO", importeMatch)
+        if (!staticFieldsValues.importe) {
+            if (importeMatch && importeMatch[3]) {
+                const importe = parseFloat(importeMatch[3].replace(',', ''));
+                setStaticFieldsValues((prev) => ({ ...prev, importe }));
+            }
+        }
+        //Extraer la FECHA
+        const fechaMatch = text.match(/(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)\s*,?\s*(\d{1,2}\s*(?:de\s*)?[A-Za-z]+\s*(?:de\s*)?\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+        console.log("FECHA", fechaMatch)
+        if (!staticFieldsValues.fecha && fechaMatch && fechaMatch[2]) {
+            const rawDate = fechaMatch[2].trim();
+            const formattedDate = parseDateString(rawDate);
+            if (formattedDate) {
+                setStaticFieldsValues(prev => ({
+                    ...prev,
+                    fecha: formattedDate
+                }));
+            }
+        }
+
+        //Extraccion segub TIPO DE DOCUMENTO
+        //PAGO DE SERVICIO.
+        if (tipoOperacion == 'PAGO_SERVICIO') {
+            //RECIBO
+            const reciboPsMatch = text.match(/(Recibo)\s*[:]?\s*(\d+)/i);
+            console.log("RECIBO", reciboPsMatch)
+            if (reciboPsMatch && reciboPsMatch[2]) {
+                setDynamicFieldsValues((prev) => ({
+                    ...prev,
+                    nro_recibo: reciboPsMatch[2].trim()
+                }));
+            }
+            //USUARIO
+            const usuarioPsMatch = text.match(/(Usuario)\s*[:]?\s*(\d+)/i);
+            if (usuarioPsMatch && usuarioPsMatch[2]) {
+                setDynamicFieldsValues((prev) => ({
+                    ...prev,
+                    codigo_usuario: usuarioPsMatch[2].trim()
+                }));
+            }
+            //TITULAR
+            const titularMatch = text.match(/Titular del servicio\s*[:]?\s*([^\n]+)/i);
+            if (titularMatch && titularMatch[1]) {
+                setDynamicFieldsValues((prev) => ({
+                    ...prev,
+                    titular: titularMatch[1].trim()
+                }));
+            }
+            //SERVICIO
+            const servicioMatch = text.match(/([^\n]+)\s*\nServicio/i);
+            if (servicioMatch && servicioMatch[1]) {
+                setDynamicFieldsValues((prev) => ({
+                    ...prev,
+                    servicio: servicioMatch[1].trim()
+                }));
+            }
+
+            //EMPRESA
+            const empresaMatch = text.match(/Pagado a\s*[:]?\s*([^\n]+)/i);
+            if (empresaMatch && empresaMatch[1]) {
+                setDynamicFieldsValues((prev) => ({
+                    ...prev,
+                    empresa: empresaMatch[1].trim()
+                }));
+            }
+
+        }
 
 
-    const handlePaste = async (event) => {
-        event.preventDefault();
-        const text = (event.clipboardData || window.clipboardData).getData('text');
-        parsePastedText(text);
+
     };
 
     const handlePasteButtonClick = async () => {
-        const text = await navigator.clipboard.readText();
-        parsePastedText(text);
+        try {
+            // Usamos la API del portapapeles
+            const text = await navigator.clipboard.readText();
+            if (text) {
+                parsePastedText(text);
+            } else {
+                alert('No hay texto en el portapapeles');
+            }
+        } catch (err) {
+            console.error('Error al leer el portapapeles:', err);
+            // Fallback para navegadores que no soportan navigator.clipboard.readText()
+            const text = prompt('Por favor pega el contenido aquí:');
+            if (text) {
+                parsePastedText(text);
+            }
+        }
     };
 
-    useEffect(() => {
-        document.addEventListener('paste', handlePaste);
-        return () => {
-            document.removeEventListener('paste', handlePaste);
-        };
-    }, []);
-
-    // Renderizamos los campos dinámicos según el tipo de operación seleccionado
     const renderDynamicFields = () => {
         if (!tipoOperacion) return null;
         const fields = DYNAMIC_FIELDS[tipoOperacion] || [];
@@ -273,7 +333,8 @@ const CrearOperacion = () => {
                             <Input
                                 placeholder={'Fecha'}
                                 type='date'
-                            // Podrías manejar otro estado para la fecha
+                                value={staticFieldsValues.fecha || ''}
+                                onChange={(e) => handleStaticFieldChange('fecha', e.target.value)}
                             />
                         </div>
                     </div>
@@ -303,16 +364,21 @@ const CrearOperacion = () => {
                         <Input
                             value={staticFieldsValues.comision}
                             label={'Comisión'}
-                            // Si la comisión siempre es 1, puedes deshabilitar el input:
                             disabled
                         />
-                        <Input
+                        <Input s
                             value={montoTotal}
                             label={'Monto Total'}
                             disabled
                         />
                         <Button icon={FaSave} title={'Guardar Operacion'} />
-                        <Button icon={FaPaste} title={'Pegar Datos'} onClick={handlePasteButtonClick} />
+
+                        <Button
+                            icon={FaPaste}
+                            title={'Pegar Datos'}
+                            onClick={handlePasteButtonClick}
+                            className="bg-blue-500 hover:bg-blue-600 text-white"
+                        />
                     </div>
                 </div>
             </div>
