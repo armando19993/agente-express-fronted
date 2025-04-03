@@ -78,11 +78,21 @@ const EXTRACTION_CONFIG = {
         { key: 'nro_tarjeta', regex: /Número de Tarjeta:\s*(\d+)/i },
         { key: 'titular', regex: /Titular:\s*(.+)/i },
     ],
+    GIRO: [
+        { key: 'dni_beneficiario', regex: /DNI\s*(\d+)/i },
+        { key: 'beneficiario', regex: /(?:Enviado a|Enviar a)\s*(.+)/i },
+    ],
+    DEPOSITO_YAPE: [
+        { key: 'banco_destino', regex: /Banco destino\s*(.+)/i },
+        { key: 'nro_cuenta', regex: /Número de Cuenta:\s*[:]?\s*[^\n]+\s*\n([*]+\s*\d+)/i },
+        { key: 'titular', regex: /Enviar a\s*(.+)/i },
+    ],
 
     // Agrega configuraciones similares para otros tipos de operación...
 };
 
 const CrearOperacion = () => {
+
     const { tipo } = useParams();
     const [tipoOperacion, setTipoOperacion] = useState("");
     const [entidad, setEntidad] = useState("");
@@ -125,15 +135,17 @@ const CrearOperacion = () => {
     const detectTipoOperacion = (text) => {
         const firstLine = text.split('\n')[0].toLowerCase();
         if (firstLine.includes('pago de servicio')) return 'PAGO_SERVICIO';
-        if (firstLine.includes('depósito') || firstLine.includes('deposito')) return 'DEPOSITO';
+        if (firstLine.includes('transferencia')) return 'DEPOSITO';
         if (firstLine.includes('giro')) return 'GIRO';
         if (firstLine.includes('tarjeta')) return 'PAGO_TARJETA';
-        if (firstLine.includes('yape')) return 'DEPOSITOS_YAPE';
-        if (firstLine.includes('pasarela')) return 'PASARELA_PAGO';
-        if (firstLine.includes('retiro')) return 'RETIRO';
+        if (firstLine.includes('celular')) return 'DEPOSITOS_YAPE';
+        if (firstLine.includes('pago con tarjeta')) return 'PASARELA_PAGO';
+        if (firstLine.includes('sqr')) return 'RETIRO';
         return "";
     };
-    //mercedes
+
+
+    //MERCEDES
 
     // Configuración de extracción por tipo de operación
     const extractionConfig = {
@@ -183,7 +195,6 @@ const CrearOperacion = () => {
                 groupIndex: 1
             },
         ],
-
         PAGO_TARJETA: [
             {
                 pattern: /Pagado a\s*[:]?\s*([^\n]+)/i,
@@ -196,16 +207,44 @@ const CrearOperacion = () => {
                 field: 'nro_tarjeta',
                 groupIndex: 1
             },
-        ]
+        ],
+        GIRO: [
+            {
+                pattern: /DNI\s*[:]?\s*([^\n]+)/i,
+                field: 'dni_beneficiario',
+                groupIndex: 1
+            },
 
+            {
+                pattern: /(?:Enviado a|Enviar a)\s*[:]?\s*([^\n]+)/i,
+                field: 'beneficiario',
+                groupIndex: 1
+            },
+        ],
+        DEPOSITOS_YAPE: [
+            {
+                pattern: /Banco destino\s*[:]?\s*([^\n]+)/i,
+                field: 'banco_destino',
+                groupIndex: 1
+            },
+            {
+                pattern: /(?:Enviado a)\s*[:]?\s*[^\n]+\s*\n([^\n]+)\s*\n([^\n]+)/i,
+                field: 'nro_cuenta',
+                groupIndex: 1
+            },
 
+            {
+                pattern: /(?:Enviado a|Enviar a)\s*[:]?\s*([^\n]+)/i,
+                field: 'titular',
+                groupIndex: 1
+            },
+        ],
     };
 
     //data dinamica
     const extractDynamicData = (text, operationType) => {
         const config = extractionConfig[operationType];
         if (!config) return;
-
         const updates = {};
 
         config.forEach(({ pattern, field, groupIndex }) => {
@@ -255,14 +294,14 @@ const CrearOperacion = () => {
 
 
     const parsePastedText = (text) => {
-
         const detectedTipo = detectTipoOperacion(text);
+        console.log(detectedTipo)
+        //console.log(text)
         if (detectedTipo) {
             setTipoOperacion(detectedTipo);
         }
 
         // Extraer datos específicos para el tipo detectado
-
         if (detectedTipo && EXTRACTION_CONFIG[detectedTipo]) {
             const extractedData = extractDataByConfig(text, EXTRACTION_CONFIG[detectedTipo]);
             const { importe, ...rest } = extractedData;
@@ -274,10 +313,8 @@ const CrearOperacion = () => {
                 ...rest,
             }));
         }
-
         // Extraer número de OPERACION (patrón común)
         const nroOperacionMatch = text.match(/(Nº de operación|Número de operación|Operación Nº)\s*[:]?\s*(\d+)/i);
-        console.log("OPERACION", nroOperacionMatch)
         if (nroOperacionMatch && nroOperacionMatch[2]) {
             setStaticFieldsValues((prev) => ({
                 ...prev,
@@ -286,7 +323,6 @@ const CrearOperacion = () => {
         }
         // Extraer IMPORTE si no se encontró en la configuración específica
         const importeMatch = text.match(/(Monto|Pagado|Transferido|enviado|Importe|Total)\s*[:]?\s*(S\/)?\s*([\d,.]+)/i);
-        console.log("MONTO", importeMatch)
         if (!staticFieldsValues.importe) {
             if (importeMatch && importeMatch[3]) {
                 const importe = parseFloat(importeMatch[3].replace(',', ''));
@@ -295,7 +331,6 @@ const CrearOperacion = () => {
         }
         //Extraer la FECHA
         const fechaMatch = text.match(/(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)\s*,?\s*(\d{1,2}\s*(?:de\s*)?[A-Za-z]+\s*(?:de\s*)?\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
-        console.log("FECHA", fechaMatch)
         if (!staticFieldsValues.fecha && fechaMatch && fechaMatch[2]) {
             const rawDate = fechaMatch[2].trim();
             const formattedDate = parseDateString(rawDate);
@@ -308,14 +343,7 @@ const CrearOperacion = () => {
         }
 
         //Extraccion segun TIPO DE DOCUMENTO
-        //PAGO DE SERVICIO.
-        if (tipoOperacion === 'PAGO_SERVICIO') {
-            extractDynamicData(text, 'PAGO_SERVICIO');
-        }
-        if (tipoOperacion === 'DEPOSITO') {
-            extractDynamicData(text, 'DEPOSITO');
-        }
-
+        extractDynamicData(text, detectedTipo);
     };
 
     const handlePasteButtonClick = async () => {
