@@ -88,19 +88,10 @@ const EXTRACTION_CONFIG = {
         { key: 'titular', regex: /Enviar a\s*(.+)/i },
     ],
 
-    PASARELA_PAGO: [
-        { key: 'nro_operacion', regex: /^([^\t]+)\t[^\t]+\t[^\t]+\t[^\t]+\t([^\t]+)/ },
-        { key: 'tipo_retiro', regex: /.*/ },
-    ],
-
-    RETIRO: [
-        { key: 'nro_operacion', regex: /Número de Cuenta:\s*[:]?\s*[^\n]+\s*\n([*]+\s*\d+)/i },
-        { key: 'tipo_retiro', regex: /Enviar a\s*(.+)/i },
-    ],
     // Agrega configuraciones similares para otros tipos de operación...
 };
 
-const CrearOperacion = () => {
+const CrearOperacionCashIn = () => {
 
     const { tipo } = useParams();
     const [tipoOperacion, setTipoOperacion] = useState("");
@@ -142,21 +133,14 @@ const CrearOperacion = () => {
     };
 
     const detectTipoOperacion = (text) => {
-        let firstLine = ""
-        if (tipo === "cashin") {
-            firstLine = text
-        }
-        else if (tipo === "cashout") {
-            firstLine = text.split('\n')[0].toLowerCase();
-        }
-
+        const firstLine = text.split('\n')[0].toLowerCase();
         if (firstLine.includes('pago de servicio')) return 'PAGO_SERVICIO';
         if (firstLine.includes('transferencia')) return 'DEPOSITO';
         if (firstLine.includes('giro')) return 'GIRO';
         if (firstLine.includes('¡Pago de tarjeta exitoso!')) return 'PAGO_TARJETA';
         if (firstLine.includes('¡Envío a celular exitoso!')) return 'DEPOSITOS_YAPE';
         if (firstLine.includes('Pago con tarjeta celular')) return 'PASARELA_PAGO';
-        if (firstLine.includes('sQR')) return 'RETIRO';
+        if (firstLine.includes('sqr')) return 'RETIRO';
         return "";
     };
 
@@ -218,9 +202,9 @@ const CrearOperacion = () => {
         ],
         PAGO_TARJETA: [
             {
-                pattern: /.*/,
+                pattern:  /.*/,
                 field: 'banco_destino',
-                value: "BCP"
+                value:"BCP"
             },
 
             {
@@ -274,30 +258,17 @@ const CrearOperacion = () => {
         ],
         // CASH IN
 
-        PASARELA_PAGO: [
+        PASARELA_PAGO:[
             {
-                pattern: /^([^\t]+)\t[^\t]+\t[^\t]+\t[^\t]+\t([^\t]+)/,
+                pattern:/^([^\t]+)\t[^\t]+\t[^\t]+\t[^\t]+\t([^\t]+)/,
                 field: 'nro_operacion',
                 groupIndex: 1
             },
 
             {
-                pattern: /.*/,
+                pattern:/^([^\t]+)\t[^\t]+\t[^\t]+\t[^\t]+\t([^\t]+)/,
                 field: 'tipo_retiro',
-                value: "Pago con tarjeta celular"
-            },
-        ],
-        RETIRO: [
-            {
-                pattern: /^([^\t]+)\t[^\t]+\t[^\t]+\t[^\t]+\t([^\t]+)/,
-                field: 'nro_operacion',
-                groupIndex: 1
-            },
-
-            {
-                pattern: /.*/,
-                field: 'tipo_retiro',
-                value: "sQR"
+                groupIndex: 2
             },
         ],
 
@@ -381,48 +352,37 @@ const CrearOperacion = () => {
                 ...rest,
             }));
         }
-        console.log("TIPO", tipo)
-        if (tipo === "cashin") {
-            
-
+        // Extraer número de OPERACION (patrón común)
+        const nroOperacionMatch = text.match(/(Nº de operación|Número de operación|Operación Nº)\s*[:]?\s*(\d+)/i);
+        if (nroOperacionMatch && nroOperacionMatch[2]) {
+            setStaticFieldsValues((prev) => ({
+                ...prev,
+                nro_operacion: nroOperacionMatch[2].trim()
+            }));
         }
-        else if (tipo === "cashout") {
-            const nroOperacionMatch = text.match(/(Nº de operación|Número de operación|Operación Nº)\s*[:]?\s*(\d+)/i);
-            const importeMatch = text.match(/(Monto|Pagado|Transferido|enviado|Importe|Total)\s*[:]?\s*(S\/)?\s*([\d,.]+)/i);
-            const fechaMatch = text.match(/(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)\s*,?\s*(\d{1,2}\s*(?:de\s*)?[A-Za-z]+\s*(?:de\s*)?\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i)
-            // Extraer número de OPERACION (patrón común)
-            if (nroOperacionMatch && nroOperacionMatch[2]) {
-                setStaticFieldsValues((prev) => ({
+        // Extraer IMPORTE si no se encontró en la configuración específica
+        const importeMatch = text.match(/(Monto|Pagado|Transferido|enviado|Importe|Total)\s*[:]?\s*(S\/)?\s*([\d,.]+)/i);
+        if (!staticFieldsValues.importe) {
+            if (importeMatch && importeMatch[3]) {
+                const importe = parseFloat(importeMatch[3].replace(',', ''));
+                setStaticFieldsValues((prev) => ({ ...prev, importe }));
+            }
+        }
+        //Extraer la FECHA
+        const fechaMatch = text.match(/(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)\s*,?\s*(\d{1,2}\s*(?:de\s*)?[A-Za-z]+\s*(?:de\s*)?\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+        if (!staticFieldsValues.fecha && fechaMatch && fechaMatch[2]) {
+            const rawDate = fechaMatch[2].trim();
+            const formattedDate = parseDateString(rawDate);
+            if (formattedDate) {
+                setStaticFieldsValues(prev => ({
                     ...prev,
-                    nro_operacion: nroOperacionMatch[2].trim()
+                    fecha: formattedDate
                 }));
             }
-            // Extraer IMPORTE si no se encontró en la configuración específica
-            if (!staticFieldsValues.importe) {
-                if (importeMatch && importeMatch[3]) {
-                    const importe = parseFloat(importeMatch[3].replace(',', ''));
-                    setStaticFieldsValues((prev) => ({ ...prev, importe }));
-                }
-            }
-            //Extraer la FECHA
-            if (!staticFieldsValues.fecha && fechaMatch && fechaMatch[2]) {
-                const rawDate = fechaMatch[2].trim();
-                const formattedDate = parseDateString(rawDate);
-                if (formattedDate) {
-                    setStaticFieldsValues(prev => ({
-                        ...prev,
-                        fecha: formattedDate
-                    }));
-                }
-            }
-
         }
-
 
         //Extraccion segun TIPO DE DOCUMENTO
         extractDynamicData(text, detectedTipo);
-
-
     };
 
     const handlePasteButtonClick = async () => {
@@ -541,4 +501,4 @@ const CrearOperacion = () => {
     );
 };
 
-export default CrearOperacion;
+export default CrearOperacionCashIn;
