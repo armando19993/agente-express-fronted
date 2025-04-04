@@ -384,7 +384,6 @@ const CrearOperacion = () => {
         console.log("TIPO", tipo)
         if (tipo === "cashin") {
             
-
         }
         else if (tipo === "cashout") {
             const nroOperacionMatch = text.match(/(Nº de operación|Número de operación|Operación Nº)\s*[:]?\s*(\d+)/i);
